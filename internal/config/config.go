@@ -29,7 +29,8 @@ type gRPCServerConfig struct {
 
 // databaseConfig описывает конфигурацию базы данных
 type databaseConfig struct {
-	path string
+	driverName string
+	path       string
 }
 
 // getEnv проверяет наличие переменной окружения и возвращает её текущее значение, либо стандартное, при отсутствии текущего
@@ -68,7 +69,12 @@ func newDatabaseConfig(log *slog.Logger) (*databaseConfig, error) {
 		log.Error("dsn cannot be empty")
 		return nil, errors.New("dsn cannot be empty")
 	}
-	return &databaseConfig{path: path}, nil
+	driverName := getEnv("DB_DRIVER_NAME", "")
+	if driverName == "" {
+		log.Error("database driver name cannot be empty")
+		return nil, errors.New("database driver name cannot be empty")
+	}
+	return &databaseConfig{driverName: driverName, path: path}, nil
 }
 
 // LoadConfig создаёт конфигурацию микросервиса
@@ -115,4 +121,9 @@ func (c *Config) GetGRPCServerPort() string {
 // GetDatabasePath геттер, для получения пути подключения к базе данных
 func (c *Config) GetDatabasePath() string {
 	return c.databaseConfig.path
+}
+
+// GetDatabaseDriverName геттер для получения драйвера базы данных
+func (c *Config) GetDatabaseDriverName() string {
+	return c.databaseConfig.driverName
 }
