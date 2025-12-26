@@ -1,4 +1,4 @@
-package grpcserver
+package events
 
 import (
 	"context"
@@ -13,12 +13,17 @@ import (
 type EventService interface {
 	GetEvents(ctx context.Context) ([]*event.Event, error)
 	GetEvent(ctx context.Context, eventID string) (*event.Event, error)
+}
+
+// UserRegister описывает метод для регистрации пользователя на мероприятие
+type UserRegister interface {
 	RegisterUser(ctx context.Context, eventID string, chatID int64, username string) (bool, error)
 }
 
 type serverAPI struct {
 	event.UnimplementedEventServiceServer
-	events EventService
+	events     EventService
+	registerer UserRegister
 }
 
 // Register регистрирует обработчик, который обрабатывает запросы, приходящие на gRPC-сервер
@@ -46,7 +51,7 @@ func (s *serverAPI) GetEvent(ctx context.Context, req *event.GetEventRequest) (*
 
 // RegisterUser обрабатывает запрос на регистрацию пользователя на конкретное событие
 func (s *serverAPI) RegisterUser(ctx context.Context, req *event.RegisterUserRequest) (*event.RegisterUserResponse, error) {
-	result, err := s.events.RegisterUser(ctx, req.GetEventId(), req.GetChatId(), req.GetUsername())
+	result, err := s.registerer.RegisterUser(ctx, req.GetEventId(), req.GetChatId(), req.GetUsername())
 	if err != nil {
 		return nil, status.Error(codes.Internal, "internal error")
 	}
