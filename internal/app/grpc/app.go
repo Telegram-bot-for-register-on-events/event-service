@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net"
 
-	eventgrpc "github.com/Telegram-bot-for-register-on-events/event-service/internal/grpc"
+	eventgrpc "github.com/Telegram-bot-for-register-on-events/event-service/internal/grpc/event"
 	"google.golang.org/grpc"
 )
 
@@ -23,10 +23,10 @@ type App struct {
 }
 
 // New создаёт новый gRPC-сервер
-func New(log *slog.Logger, port string) *App {
+func New(log *slog.Logger, port string, events eventgrpc.EventService) *App {
 	grpcServer := grpc.NewServer()
 	// Подключаем обработчик
-	eventgrpc.Register(grpcServer)
+	eventgrpc.Register(grpcServer, events)
 	return &App{
 		log:        log,
 		gRPCServer: grpcServer,
