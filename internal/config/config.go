@@ -5,8 +5,14 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
+)
+
+// Константы для описания операций
+const (
+	opLoadConfig = "config.load"
 )
 
 // Config описывает конфигурацию микросервиса
@@ -17,7 +23,8 @@ type Config struct {
 
 // gRPCServerConfig описывает конфигурацию gRPC-сервера
 type gRPCServerConfig struct {
-	port string
+	port    string
+	timeout time.Duration
 }
 
 // databaseConfig описывает конфигурацию базы данных
@@ -36,11 +43,23 @@ func getEnv(key, reserve string) string {
 // newGRPCServerConfig загружает конфигурацию для gRPC-сервера
 func newGRPCServerConfig(log *slog.Logger) (*gRPCServerConfig, error) {
 	port := getEnv("GRPC_PORT", "")
+	timeoutStr := getEnv("GRPC_TIMEOUT", "")
+	if timeoutStr == "" {
+		log.Error("gRPC timeout cannot be empty")
+		return nil, errors.New("gRPC timeout cannot be empty")
+	}
+
+	timeout, err := time.ParseDuration(timeoutStr)
+	if err != nil {
+		log.Error("error parsing GRPC_TIMEOUT", "timeout", timeoutStr, "error", err)
+		return nil, err
+	}
+
 	if port == "" {
 		log.Error("gRPC port cannot be empty")
 		return nil, errors.New("gRPC port cannot be empty")
 	}
-	return &gRPCServerConfig{port}, nil
+	return &gRPCServerConfig{port, timeout}, nil
 }
 
 func newDatabaseConfig(log *slog.Logger) (*databaseConfig, error) {
@@ -57,22 +76,22 @@ func LoadConfig(log *slog.Logger) (*Config, error) {
 	log.Info("loading environment variables")
 	// Загрузка переменных окружения из .env
 	if err := godotenv.Load(); err != nil {
-		log.Error("error load config", err.Error())
-		return nil, fmt.Errorf("error load config - %w", err)
+		log.Error("operation", opLoadConfig, err.Error())
+		return nil, fmt.Errorf("%s: %w", opLoadConfig, err)
 	}
 	log.Info("environment variables successfully loaded")
 
 	// Создаём конфигурацию базы данных
 	dbCfg, err := newDatabaseConfig(log)
 	if err != nil {
-		log.Error("error load config", err.Error())
+		log.Error("operation", opLoadConfig, err.Error())
 		return nil, err
 	}
 
 	// Создаём конфигурацию gRPC-клиента
 	gRPCCfg, err := newGRPCServerConfig(log)
 	if err != nil {
-		log.Error("error load config", err.Error())
+		log.Error("operation", opLoadConfig, err.Error())
 		return nil, err
 	}
 
