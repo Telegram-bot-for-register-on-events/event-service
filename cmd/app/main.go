@@ -15,7 +15,7 @@ func main() {
 	// Создаём новый инстанс микросервиса
 	application := app.NewApp(log)
 	// Запускаем его
-	application.GRPCServer.MustRun()
+	go application.GRPCServer.MustRun()
 	// Создаём канал для приёма сигналов операционной системы
 	stop := make(chan os.Signal, 1)
 	// Передаём входящие сигналы в канал stop
