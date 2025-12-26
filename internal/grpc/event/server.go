@@ -1,4 +1,4 @@
-package grpc
+package grpcserver
 
 import (
 	"context"
@@ -22,8 +22,8 @@ type serverAPI struct {
 }
 
 // Register регистрирует обработчик, который обрабатывает запросы, приходящие на gRPC-сервер
-func Register(grpc *grpc.Server) {
-	event.RegisterEventServiceServer(grpc, &serverAPI{})
+func Register(grpc *grpc.Server, events EventService) {
+	event.RegisterEventServiceServer(grpc, &serverAPI{events: events})
 }
 
 // GetEvents обрабатывает входящий запрос на получение всех событий
