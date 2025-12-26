@@ -4,7 +4,9 @@ go 1.25.5
 
 require (
 	github.com/Telegram-bot-for-register-on-events/shared-proto v0.0.0-20251222145406-222d89023129 // indirect
+	github.com/jmoiron/sqlx v1.4.0 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
+	github.com/lib/pq v1.10.9 // indirect
 	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
