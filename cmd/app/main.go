@@ -3,16 +3,28 @@ package main
 import (
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/Telegram-bot-for-register-on-events/event-service/internal/config"
+	"github.com/Telegram-bot-for-register-on-events/event-service/internal/app"
 )
 
 func main() {
+	// Инициализируем логгер
 	log := setupLogger()
-	cfg := config.MustLoadConfig(log)
-}
+	// Создаём новый инстанс микросервиса
+	application := app.NewApp(log)
+	// Запускаем его
+	application.GRPCServer.MustRun()
+	// Создаём канал для приёма сигналов операционной системы
+	stop := make(chan os.Signal, 1)
+	// Передаём входящие сигналы в канал stop
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	// Читаем из канала, пока не придёт соответствующий сигнал
+	<-stop
 
-// TODO: Написать микросервис: сервер, принимающий запросы и возвращающий ответ
+	application.GRPCServer.Stop()
+}
 
 func setupLogger() *slog.Logger {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
