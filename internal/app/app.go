@@ -5,6 +5,7 @@ import (
 
 	"github.com/Telegram-bot-for-register-on-events/event-service/internal/app/grpc"
 	"github.com/Telegram-bot-for-register-on-events/event-service/internal/config"
+	"github.com/Telegram-bot-for-register-on-events/event-service/internal/service"
 	"github.com/Telegram-bot-for-register-on-events/event-service/internal/storage/postgres"
 )
 
@@ -21,7 +22,8 @@ func NewApp(log *slog.Logger) *App {
 	if err != nil {
 		panic(err)
 	}
-	grpcApp := grpcserver.New(log, cfg.GetGRPCServerPort(), db)
+	s := service.NewService(log, db, db)
+	grpcApp := grpcserver.New(log, cfg.GetGRPCServerPort(), s, s)
 	return &App{
 		GRPCServer: grpcApp,
 		cfg:        cfg,
