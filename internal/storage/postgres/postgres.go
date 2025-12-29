@@ -79,6 +79,20 @@ func (s *Storage) GetEvent(ctx context.Context, eventID string) (*event.Event, e
 	return convertingEventsStruct(e), nil
 }
 
+func (s *Storage) RegisterUser(ctx context.Context, eventID string, chatID int64, username string) (bool, error) {
+	_, err := s.DB.NamedExecContext(ctx, "insert into register_users (event_id, chat_id, username) values (:event_id, :chat_id, :username) on conflict (event_id) do nothing",
+		map[string]interface{}{
+			"event_id": eventID,
+			"chat_id":  chatID,
+			"username": username,
+		})
+	if err != nil {
+		s.log.Error("operation", "postgres.RegisterUserOnEvent", err.Error())
+		return false, fmt.Errorf("%s: %w", "postgres.RegisterUserOnEvent", err)
+	}
+	return true, nil
+}
+
 func convertingEventsStruct(eventDB models.Event) *event.Event {
 	return &event.Event{
 		Id:          eventDB.ID,
