@@ -27,8 +27,8 @@ type serverAPI struct {
 }
 
 // Register регистрирует обработчик, который обрабатывает запросы, приходящие на gRPC-сервер
-func Register(grpc *grpc.Server, events EventService) {
-	event.RegisterEventServiceServer(grpc, &serverAPI{events: events})
+func Register(grpc *grpc.Server, events EventService, registerer UserRegister) {
+	event.RegisterEventServiceServer(grpc, &serverAPI{events: events, registerer: registerer})
 }
 
 // GetEvents обрабатывает входящий запрос на получение всех событий
