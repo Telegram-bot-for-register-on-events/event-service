@@ -23,10 +23,10 @@ type App struct {
 }
 
 // New создаёт новый gRPC-сервер
-func New(log *slog.Logger, port string, events eventgrpc.EventService) *App {
+func New(log *slog.Logger, port string, events eventgrpc.EventService, registerer eventgrpc.UserRegister) *App {
 	grpcServer := grpc.NewServer()
 	// Подключаем обработчик
-	eventgrpc.Register(grpcServer, events)
+	eventgrpc.Register(grpcServer, events, registerer)
 	return &App{
 		log:        log,
 		gRPCServer: grpcServer,
