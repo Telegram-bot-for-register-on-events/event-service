@@ -23,10 +23,10 @@ type App struct {
 }
 
 // New создаёт новый gRPC-сервер
-func New(log *slog.Logger, port string, events eventgrpc.EventService, registerer eventgrpc.UserRegister) *App {
+func New(log *slog.Logger, port string, events eventgrpc.EventService, publisher eventgrpc.Publisher, registerer eventgrpc.Registerer) *App {
 	grpcServer := grpc.NewServer()
 	// Подключаем обработчик
-	eventgrpc.Register(grpcServer, events, registerer)
+	eventgrpc.Register(grpcServer, events, publisher, registerer)
 	return &App{
 		log:        log,
 		gRPCServer: grpcServer,
@@ -39,15 +39,15 @@ func (a *App) start() error {
 	// Инициализируем tcp-слушателя на указанном порту
 	listener, err := net.Listen("tcp", ":"+a.port)
 	if err != nil {
-		return fmt.Errorf("error starting gRPC server - %w", err)
+		return fmt.Errorf("%s: %w", opStart, err)
 	}
 
 	a.log.Info("running gRPC-server...", slog.String("operation", opStart), slog.String("port", a.port))
 
 	// Принимаем входящие соединения от слушателя
 	if err = a.gRPCServer.Serve(listener); err != nil {
-		a.log.Info("error starting gRPC server", slog.String("error", err.Error()))
-		return fmt.Errorf("error starting gRPC server - %w", err)
+		a.log.Info("error", err.Error(), slog.String("operation", opStart))
+		return fmt.Errorf("%s: %w", opStart, err)
 	}
 
 	return nil

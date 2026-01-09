@@ -15,7 +15,7 @@ func main() {
 	// Создаём новый инстанс микросервиса
 	application := app.NewApp(log)
 	// Запускаем его
-	go application.GRPCServer.MustRun()
+	application.MustStart()
 	// Создаём канал для приёма сигналов операционной системы
 	stop := make(chan os.Signal, 1)
 	// Передаём входящие сигналы в канал stop
@@ -23,7 +23,7 @@ func main() {
 	// Читаем из канала, пока не придёт соответствующий сигнал
 	<-stop
 
-	application.GRPCServer.Stop()
+	application.Stop()
 }
 
 func setupLogger() *slog.Logger {

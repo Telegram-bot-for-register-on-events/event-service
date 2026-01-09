@@ -1,6 +1,7 @@
 services:
   event-db:
     image: postgres:16
+    container_name: postgres-es
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -9,6 +10,53 @@ services:
       - 5433:5432
     volumes:
       - event-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d event-service" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  nats-js:
+    image: nats:latest
+    container_name: nats
+    ports:
+      - 4222:4222
+      - 8222:8222
+    command: >
+      -js
+    restart: unless-stopped
+
+  migrate:
+    build: .
+    command: [ "/app/migrator", "up" ]
+    environment:
+      - DIR=internal/storage/postgres/migrations
+      - DSN=postgres://postgres:postgres@event-db:5432/event-service?sslmode=disable
+    depends_on:
+      event-db:
+        condition: service_healthy
+    restart: on-failure
+
+  event:
+    build: .
+    command: [ "/app/app" ]
+    environment:
+      - GRPC_PORT=8001
+      - GRPC_TIMEOUT=2s
+      - DB_DRIVER_NAME=postgres
+      - DSN=postgres://postgres:postgres@event-db:5432/event-service?sslmode=disable
+      - NATS_URL=nats:4222
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      nats-js:
+        condition: service_started
+    restart: unless-stopped
+
+networks:
+  default:
+    name: shared-services-net
+    external: true
 
 volumes:
   event-db-data:

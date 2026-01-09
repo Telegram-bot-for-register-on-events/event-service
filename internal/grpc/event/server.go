@@ -2,7 +2,10 @@ package events
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
+	"github.com/Telegram-bot-for-register-on-events/event-service/internal/domain/models"
 	"github.com/Telegram-bot-for-register-on-events/shared-proto/pb/event"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -15,20 +18,27 @@ type EventService interface {
 	GetEvent(ctx context.Context, eventID string) (*event.Event, error)
 }
 
-// UserRegister описывает метод для регистрации пользователя на мероприятие
-type UserRegister interface {
-	RegisterUser(ctx context.Context, eventID string, chatID int64, username string) (bool, error)
+// Registerer описывает метод для передачи данных о регистрации в сервисный слой
+type Registerer interface {
+	RegisterUser(ctx context.Context, eventID string, chatID int64, username string) error
 }
 
+// Publisher описывает метод для публикации сообщения в Nats
+type Publisher interface {
+	PublishMessage(topic string, data []byte) error
+}
+
+// serverAPI описывает API для взаимодействия с gRPC-сервером
 type serverAPI struct {
 	event.UnimplementedEventServiceServer
 	events     EventService
-	registerer UserRegister
+	publisher  Publisher
+	registerer Registerer
 }
 
 // Register регистрирует обработчик, который обрабатывает запросы, приходящие на gRPC-сервер
-func Register(grpc *grpc.Server, events EventService, registerer UserRegister) {
-	event.RegisterEventServiceServer(grpc, &serverAPI{events: events, registerer: registerer})
+func Register(grpc *grpc.Server, events EventService, publisher Publisher, registerer Registerer) {
+	event.RegisterEventServiceServer(grpc, &serverAPI{events: events, publisher: publisher, registerer: registerer})
 }
 
 // GetEvents обрабатывает входящий запрос на получение всех событий
@@ -51,9 +61,28 @@ func (s *serverAPI) GetEvent(ctx context.Context, req *event.GetEventRequest) (*
 
 // RegisterUser обрабатывает запрос на регистрацию пользователя на конкретное событие
 func (s *serverAPI) RegisterUser(ctx context.Context, req *event.RegisterUserRequest) (*event.RegisterUserResponse, error) {
-	result, err := s.registerer.RegisterUser(ctx, req.GetEventId(), req.GetChatId(), req.GetUsername())
+	err := s.registerer.RegisterUser(ctx, req.GetEventId(), req.GetChatId(), req.GetUsername())
 	if err != nil {
-		return nil, status.Error(codes.Internal, "internal error")
+		return &event.RegisterUserResponse{Success: false}, fmt.Errorf("events.RegisterUser: %w", err)
 	}
-	return &event.RegisterUserResponse{Success: result}, nil
+
+	// Формируем сообщение для публикации в шину данных
+	user := &models.User{
+		ChatID:   req.GetChatId(),
+		Username: req.GetUsername(),
+		EventID:  req.GetEventId(),
+	}
+
+	// Сериализируем данные
+	jsonData, err := json.Marshal(user)
+	if err != nil {
+		return &event.RegisterUserResponse{Success: false}, fmt.Errorf("events.RegisterUser: %w", err)
+	}
+
+	// Публикуем сообщение
+	err = s.publisher.PublishMessage("register.user", jsonData)
+	if err != nil {
+		return &event.RegisterUserResponse{Success: false}, fmt.Errorf("events.RegisterUser: %w", err)
+	}
+	return &event.RegisterUserResponse{Success: true}, nil
 }

@@ -1,0 +1,8 @@
+GRPC_PORT=8001
+GRPC_TIMEOUT=2s
+DB_DRIVER_NAME=postgres
+DSN=postgres://postgres:postgres@event-db:5432/event-service?sslmode=disable
+DIR=internal/storage/postgres/migrations
+NATS_URL=nats:4222
+NATS_TOPIC=register.user
+NATS_STREAM=Event

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"time"
 
 	"github.com/Telegram-bot-for-register-on-events/event-service/internal/domain/models"
 	"github.com/Telegram-bot-for-register-on-events/shared-proto/pb/event"
@@ -18,6 +19,7 @@ const (
 	opCloseConnection = "postgres.closeConnection"
 	opGetEvents       = "postgres.getEvents"
 	opGetEvent        = "postgres.getEvent"
+	opRegister        = "postgres.register"
 )
 
 // Storage описывает слой взаимодействия с базой данных
@@ -26,20 +28,20 @@ type Storage struct {
 	log *slog.Logger
 }
 
-// NewStorage описывает объект базы данных
+// NewStorage конструктор для Storage
 func NewStorage(log *slog.Logger, driverName, dsn string) (*Storage, error) {
 	db, err := sqlx.Open(driverName, dsn)
 	if err != nil {
-		log.Error("operation", opConnect, err.Error())
+		log.Error("error", err.Error(), slog.String("operation", opConnect))
 		return nil, fmt.Errorf("%s: %w", opConnect, err)
 	}
 
 	// Проверяем подключение к базе данных, в противном случае возвращаем ошибку
 	if err = db.Ping(); err != nil {
-		log.Error("operation", opConnect, err.Error())
+		log.Error("error", err.Error(), slog.String("operation", opConnect))
 		return nil, fmt.Errorf("%s: %w", opConnect, err)
 	}
-	log.Info("connection to database successfully")
+
 	return &Storage{
 		DB:  db,
 		log: log,
@@ -48,9 +50,8 @@ func NewStorage(log *slog.Logger, driverName, dsn string) (*Storage, error) {
 
 // Close закрывает соединение с базой данных
 func (s *Storage) Close() {
-	s.log.Info("operation", opCloseConnection)
 	if err := s.DB.Close(); err != nil {
-		s.log.Error("closing database connection", err.Error())
+		s.log.Error("error", err.Error(), slog.String("operation", opCloseConnection))
 	}
 }
 
@@ -58,7 +59,7 @@ func (s *Storage) GetEvents(ctx context.Context) ([]*event.Event, error) {
 	var eventsDB []models.Event
 	err := s.DB.SelectContext(ctx, &eventsDB, `select * from events`)
 	if err != nil {
-		s.log.Error("operation", opGetEvents, err.Error())
+		s.log.Error("error", err.Error(), slog.String("operation", opGetEvents))
 		return nil, fmt.Errorf("%s: %w", opGetEvents, err)
 	}
 	// Преобразуем DB-структуры в protobuf-структуры
@@ -73,24 +74,26 @@ func (s *Storage) GetEvent(ctx context.Context, eventID string) (*event.Event, e
 	var e models.Event
 	err := s.DB.GetContext(ctx, &e, `select * from events where id = $1`, eventID)
 	if err != nil {
-		s.log.Error("operation", opGetEvent, err.Error())
+		s.log.Error("error", err.Error(), slog.String("operation", opGetEvent))
 		return nil, fmt.Errorf("%s: %w", opGetEvent, err)
 	}
 	return convertingEventsStruct(e), nil
 }
 
-func (s *Storage) RegisterUser(ctx context.Context, eventID string, chatID int64, username string) (bool, error) {
-	_, err := s.DB.NamedExecContext(ctx, "insert into register_users (event_id, chat_id, username) values (:event_id, :chat_id, :username) on conflict (event_id) do nothing",
-		map[string]interface{}{
-			"event_id": eventID,
-			"chat_id":  chatID,
-			"username": username,
-		})
-	if err != nil {
-		s.log.Error("operation", "postgres.RegisterUserOnEvent", err.Error())
-		return false, fmt.Errorf("%s: %w", "postgres.RegisterUserOnEvent", err)
+func (s *Storage) RegisterUser(ctx context.Context, eventID string, chatID int64, username string) error {
+	query := `insert into registration (event_id, chat_id, username, created_at) values ($1, $2, $3, $4)`
+	reg := &models.Registration{
+		EventID:   eventID,
+		ChatID:    chatID,
+		Username:  username,
+		CreatedAt: time.Now(),
 	}
-	return true, nil
+	_, err := s.DB.NamedExecContext(ctx, query, reg)
+	if err != nil {
+		s.log.Error("error", err.Error(), slog.String("operation", opRegister))
+		return fmt.Errorf("%s: %w", opRegister, err)
+	}
+	return nil
 }
 
 func convertingEventsStruct(eventDB models.Event) *event.Event {

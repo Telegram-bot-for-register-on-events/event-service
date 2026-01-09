@@ -10,16 +10,16 @@ import (
 
 // Константы для описания операций
 const (
-	opGetEvents    = "service.GetEvents"
-	opGetEvent     = "service.GetEvent"
-	opRegisterUser = "service.RegisterUser"
+	opGetEvents = "service.GetEvents"
+	opGetEvent  = "service.GetEvent"
+	opRegister  = "service.Register"
 )
 
 // Service описывает сервисный слой микросервиса
 type Service struct {
 	log           *slog.Logger
 	eventReceiver EventReceiver
-	userRegister  UserRegister
+	registerer    Registerer
 }
 
 // EventReceiver описывает методы для получения информации о событиях
@@ -28,24 +28,23 @@ type EventReceiver interface {
 	GetEvent(ctx context.Context, eventID string) (*pb.Event, error)
 }
 
-// UserRegister описывает метод для регистрации пользователя на конкретное событие
-type UserRegister interface {
-	RegisterUser(ctx context.Context, eventID string, chatID int64, username string) (bool, error)
+// Registerer описывает метод для взаимодействия с repo-слоем
+type Registerer interface {
+	RegisterUser(ctx context.Context, eventID string, chatID int64, username string) error
 }
 
 // NewService конструктор для создания Service
-func NewService(log *slog.Logger, eventReceiver EventReceiver, userRegister UserRegister) *Service {
+func NewService(log *slog.Logger, eventReceiver EventReceiver, registerer Registerer) *Service {
 	return &Service{
 		log:           log,
 		eventReceiver: eventReceiver,
-		userRegister:  userRegister,
+		registerer:    registerer,
 	}
 }
 
 func (s *Service) GetEvents(ctx context.Context) ([]*pb.Event, error) {
 	events, err := s.eventReceiver.GetEvents(ctx)
 	if err != nil {
-		s.log.Error("operation", opGetEvents, "error", err)
 		return nil, fmt.Errorf("%s: %w", opGetEvents, err)
 	}
 	return events, nil
@@ -54,17 +53,15 @@ func (s *Service) GetEvents(ctx context.Context) ([]*pb.Event, error) {
 func (s *Service) GetEvent(ctx context.Context, eventID string) (*pb.Event, error) {
 	event, err := s.eventReceiver.GetEvent(ctx, eventID)
 	if err != nil {
-		s.log.Error("operation", opGetEvent, "error", err)
 		return nil, fmt.Errorf("%s: %w", opGetEvent, err)
 	}
 	return event, nil
 }
 
-func (s *Service) RegisterUser(ctx context.Context, eventID string, chatID int64, username string) (bool, error) {
-	result, err := s.userRegister.RegisterUser(ctx, eventID, chatID, username)
+func (s *Service) RegisterUser(ctx context.Context, eventID string, chatID int64, username string) error {
+	err := s.registerer.RegisterUser(ctx, eventID, chatID, username)
 	if err != nil {
-		s.log.Error("operation", opRegisterUser, "error", err)
-		return false, fmt.Errorf("%s: %w", opRegisterUser, err)
+		return fmt.Errorf("%s: %w", opRegister, err)
 	}
-	return result, nil
+	return nil
 }
